@@ -1,0 +1,6 @@
+TARGETNAME=hlwd
+TARGETTYPE=DRIVER
+TARGETPATH=obj
+
+INCLUDES= ..\..\..\inc
+SOURCES = hlwd.c
