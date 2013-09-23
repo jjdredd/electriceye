@@ -25,44 +25,56 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
   DbgPrint("Driver Entry \n");
   RtlInitUnicodeString(&usDriverName, L"\\Device\\ElectricEye");
   RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\ElectricEye");
-  NtStatus = IoCreateDevice(pDriverObject, 0,
-			    &usDriverName,
-			    FILE_DEVICE_UNKNOWN,
-			    FILE_DEVICE_SECURE_OPEN,
-			    FALSE, &pDeviceObject);
-  IoCreateSymbolicLink(&usDosDeviceName, &usDriverName);
-  for(i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++)
-    pDriverObject->MajorFunction[i] = &NotImplemented;
-  pDriverObject->MajorFunction[IRP_MJ_CLOSE] = &Close;
-  pDriverObject->MajorFunction[IRP_MJ_CREATE] = &Create;
-  pDriverObject->MajorFunction[IRP_MJ_READ] = &Read;
-  pDriverObject->DriverUnload = &Dtor;
-  pDeviceObject->Flags |= DO_DIRECT_IO;
-  pDeviceObject->Flags &= (~DO_DEVICE_INITIALIZING);
-
   /* Guess number one: video card device name */
   RtlInitUnicodeString(&usVideoDeviceName, L"\\Device\\Video0");
-  if( !NT_SUCCESS(IoGetDeviceObjectPointer(&usVideoDeviceName, FILE_READ_DATA,
-				&FileObject, pVideoDeviceObject))){
+
+  if( !NT_SUCCESS(NtStatus = IoGetDeviceObjectPointer(&usVideoDeviceName, 
+/* FILE_READ_DATA FILE_READ_ATTRIBUTES MAXIMUM_ALLOWED*/
+							READ_CONTROL,
+							&FileObject,
+							pVideoDeviceObject))){
     DbgPrint("couldn't get device object pointer \n");
-    return  STATUS_UNSUCCESSFUL;
+	switch(NtStatus){ 
+		case STATUS_OBJECT_TYPE_MISMATCH:
+			DbgPrint("STATUS_OBJECT_TYPE_MISMATCH\n");
+			break;
+		case STATUS_INVALID_PARAMETER:
+			DbgPrint("case STATUS_INVALID_PARAMETER\n");
+			break;
+		case STATUS_PRIVILEGE_NOT_HELD:
+			DbgPrint("STATUS_PRIVILEGE_NOT_HELD\n");
+			break;
+		case STATUS_INSUFFICIENT_RESOURCES:
+			DbgPrint("STATUS_INSUFFICIENT_RESOURCES\n");
+			break;
+		case STATUS_OBJECT_NAME_INVALID:
+			DbgPrint("STATUS_OBJECT_NAME_INVALID\n");
+			break;
+		case STATUS_ACCESS_DENIED:
+			DbgPrint("STATUS_ACCESS_DENIED\n");
+			break;
+		default:
+			DbgPrint("%X\n", NtStatus);
+	}
+   return STATUS_UNSUCCESSFUL;
   }
   
-  if( (pVideoDevResList = ExAllocatePool(NonPagedPool, ResourceListSz)) 
+  if( (pVideoDevResList = ExAllocatePool(NonPagedPool, ResourceListSz))
       == NULL ){
     DbgPrint("couldn't allocate pool\n");
     ObDereferenceObject(&FileObject);
     return  STATUS_UNSUCCESSFUL;
   }
-
-  while( (NtStatus = IoGetDeviceProperty(pVideoDeviceObject, 
-			      DevicePropertyBootConfigurationTranslated,
-			      ResourceListSz, (PVOID)pVideoDevResList, 
-			      &ResourceListNeededSz))
-	 == STATUS_BUFFER_TOO_SMALL ){
+  
+  while( (NtStatus = IoGetDeviceProperty(pVideoDeviceObject,
+					 DevicePropertyBootConfigurationTranslated,
+					 ResourceListSz, 
+					 (PVOID)pVideoDevResList,
+					 &ResourceListNeededSz))
+	  == STATUS_BUFFER_TOO_SMALL ){
     ExFreePool(pVideoDevResList);
-    if( (pVideoDevResList = ExAllocatePool(NonPagedPool, 
-					  ResourceListNeededSz)) 
+    if( (pVideoDevResList = ExAllocatePool(NonPagedPool,
+					   ResourceListNeededSz))
 	== NULL ){
       DbgPrint("couldn't reallocate pool\n");
       ObDereferenceObject(&FileObject);
@@ -70,9 +82,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
     }
   }
   if(!NT_SUCCESS(NtStatus)){
-	DbgPrint("couldn't get device property\n");
-ObDereferenceObject(&FileObject);
-	return STATUS_UNSUCCESSFUL;
+    DbgPrint("couldn't get device property\n");
+    ObDereferenceObject(&FileObject);
+    return STATUS_UNSUCCESSFUL;
   }
   /* have you seen the movie called Inception ? here it goes */
   DbgPrint("full list starting\n");
@@ -104,7 +116,23 @@ ObDereferenceObject(&FileObject);
   DbgPrint("FB mapped @ virt addr %p", vaddr);
   if(!vaddr) NtStatus = STATUS_UNSUCCESSFUL;
   ExFreePool(pVideoDevResList);
-ObDereferenceObject(&FileObject);
+  ObDereferenceObject(&FileObject);
+
+  NtStatus = IoCreateDevice(pDriverObject, 0,
+			    &usDriverName,
+			    FILE_DEVICE_UNKNOWN,
+			    FILE_DEVICE_SECURE_OPEN,
+			    FALSE, &pDeviceObject);
+  IoCreateSymbolicLink(&usDosDeviceName, &usDriverName);
+  for(i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++)
+    pDriverObject->MajorFunction[i] = &NotImplemented;
+  pDriverObject->MajorFunction[IRP_MJ_CLOSE] = &Close;
+  pDriverObject->MajorFunction[IRP_MJ_CREATE] = &Create;
+  pDriverObject->MajorFunction[IRP_MJ_READ] = &Read;
+  pDriverObject->DriverUnload = &Dtor;
+  pDeviceObject->Flags |= DO_DIRECT_IO;
+  pDeviceObject->Flags &= (~DO_DEVICE_INITIALIZING);
+  
   return NtStatus;
 }
 
