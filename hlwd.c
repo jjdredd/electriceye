@@ -45,8 +45,10 @@ NTSTATUS Read(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   PCHAR pBuffer;
   int i;
   char *c;
+  NTSTATUS NtStatus = STATUS_UNSUCCESSFUL;
 
   DbgPrint("Read Called \r\n");
+  Irp->IoStatus.Information = 0;
   pIoStackIrp = IoGetCurrentIrpStackLocation(Irp);
   if(pIoStackIrp){
     size = pIoStackIrp->Parameters.Read.Length;
@@ -59,16 +61,14 @@ NTSTATUS Read(PDEVICE_OBJECT  DriverObject, PIRP Irp){
       _asm cli;
       RtlMoveMemory(pBuffer, vaddr, size);
       _asm sti;
+      Irp->IoStatus.Information = size;
     }
-    else{
-      DbgPrint("vaddr or PBuffer = NULL\r\n");
-      IoCompleteRequest(Irp, IO_NO_INCREMENT);
-      return STATUS_UNSUCCESSFUL;
-    }
+    else DbgPrint("vaddr or PBuffer = NULL\r\n");
   }
-  DbgPrint("Move successful!\n");
+  else DbgPrint("can't get stack location\r\n");
+  Irp->IoStatus.Status = NtStatus;
   IoCompleteRequest(Irp, IO_NO_INCREMENT);
-  return STATUS_SUCCESS;
+  return NtStatus;
 }
 
 NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
