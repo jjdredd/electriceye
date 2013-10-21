@@ -94,6 +94,8 @@ NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
     }
   }
   else status = STATUS_INVALID_DEVICE_REQUEST;
+  Irp->IoStatus.Status = status;
+  IoCompleteRequest(Irp, IO_NO_INCREMENT);
   return status;
 }
 
