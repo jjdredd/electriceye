@@ -1,13 +1,12 @@
 #include <ntddk.h>
 #include <Wdm.h>
 
-#define IOCTL_EEYE_INITFB CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_IN_DIRECT,
-FILE_ANY_ACCESS)
+#define IOCTL_EEYE_INITFB CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_IN_DIRECT, FILE_ANY_ACCESS)
 
 NTSTATUS Read(PDEVICE_OBJECT, PIRP);
 NTSTATUS Create(PDEVICE_OBJECT, PIRP);
 NTSTATUS Close(PDEVICE_OBJECT, PIRP);
-NTSTATUS HandleIOCTL(PDEVICE_OBJECT, PIRP)
+NTSTATUS HandleIOCTL(PDEVICE_OBJECT, PIRP);
 NTSTATUS NotImplemented(PDEVICE_OBJECT, PIRP);
 void Dtor(PDRIVER_OBJECT );
 int FBPhysAddr = 0, FBSz = 0;
@@ -76,19 +75,23 @@ NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   PIO_STACK_LOCATION pIoStackIrp = IoGetCurrentIrpStackLocation(Irp);
   int *payload;
   PHYSICAL_ADDRESS paddr;
+
+	DbgPrint("IOCTL handler called\r\n");
   if( (pIoStackIrp->
        Parameters.DeviceIoControl.IoControlCode == IOCTL_EEYE_INITFB)
       && (pIoStackIrp->
-	  Parameters.DeviceIoControl.OutputBufferLength == 2*sizeof(int))
+	  Parameters.DeviceIoControl.InputBufferLength == 2*sizeof(int))
       && (Irp->AssociatedIrp.SystemBuffer) ){
     payload = (int *)Irp->AssociatedIrp.SystemBuffer;
     FBPhysAddr = payload[0];
     FBSz = payload[1];
-    paddr.QuadPart = FBPhysAddr;
-    vaddr = MmMapIoSpace(paddr, FBSz, MmNonCached);
-    DbgPrint("FBPhysAddr: %p,\nPBSz: 0x%x,\nFB mapped @ virt addr %p\n", 
-	     FBPhysAddr, FBSz, vaddr);
-    status = STATUS_SUCCESS;
+    if( FBPhysAddr && (FBSz > 0) ){
+      paddr.QuadPart = FBPhysAddr;
+      vaddr = MmMapIoSpace(paddr, FBSz, MmNonCached);
+      DbgPrint("FBPhysAddr: %p,\nPBSz: 0x%x,\nFB mapped @ virt addr %p\n", 
+	       FBPhysAddr, FBSz, vaddr);
+      status = STATUS_SUCCESS;
+    }
   }
   else status = STATUS_INVALID_DEVICE_REQUEST;
   return status;
@@ -96,7 +99,7 @@ NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
 
 NTSTATUS Create(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   DbgPrint("Create called\r\n");
-  return STATUS_SUCCESS;
+  return STATUS_SUCCESS; 
 }
 
 NTSTATUS Close(PDEVICE_OBJECT  DriverObject, PIRP Irp){
@@ -111,7 +114,7 @@ NTSTATUS Close(PDEVICE_OBJECT  DriverObject, PIRP Irp){
 
 NTSTATUS NotImplemented(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   DbgPrint("NotImplemented called\r\n");
-  return STATUS_SUCCESS;
+  return STATUS_SUCCESS; //STATUS_NOT_IMPLEMENTED?
 }
 
 void Dtor(PDRIVER_OBJECT  DriverObject){
@@ -122,4 +125,5 @@ void Dtor(PDRIVER_OBJECT  DriverObject){
   RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\Example");
   IoDeleteSymbolicLink(&usDosDeviceName);
   IoDeleteDevice(DriverObject->DeviceObject);
+	return STATUS_SUCCESS;
 }
