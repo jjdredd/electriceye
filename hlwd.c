@@ -105,11 +105,6 @@ NTSTATUS Create(PDEVICE_OBJECT  DriverObject, PIRP Irp){
 }
 
 NTSTATUS Close(PDEVICE_OBJECT  DriverObject, PIRP Irp){
-  if(vaddr){ 
-    MmUnmapIoSpace(vaddr, FBSz);
-    vaddr = 0;
-  }
-  DbgPrint("FB unmapped\n");
   DbgPrint("Close Called\r\n");
   return STATUS_SUCCESS;
 }
