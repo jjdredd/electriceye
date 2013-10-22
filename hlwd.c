@@ -118,8 +118,10 @@ NTSTATUS NotImplemented(PDEVICE_OBJECT  DriverObject, PIRP Irp){
 void Dtor(PDRIVER_OBJECT  DriverObject){
   UNICODE_STRING usDosDeviceName;
   DbgPrint("Dtor Called \n");
-  if(vaddr) MmUnmapIoSpace(vaddr, FBSz);
-  DbgPrint("FB unmapped\n");
+  if(vaddr){ 
+    MmUnmapIoSpace(vaddr, FBSz);
+    DbgPrint("FB unmapped\n");
+  }
   RtlInitUnicodeString(&usDosDeviceName, L"\\DosDevices\\Example");
   IoDeleteSymbolicLink(&usDosDeviceName);
   IoDeleteDevice(DriverObject->DeviceObject);
