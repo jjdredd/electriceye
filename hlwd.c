@@ -47,7 +47,7 @@ NTSTATUS Read(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   NTSTATUS NtStatus = STATUS_UNSUCCESSFUL;
 
   DbgPrint("Read Called \r\n");
-  Irp->IoStatus.Information = 0;
+  Irp->IoStatus.Information = Irp->IoStatus.Information = 0;
   pIoStackIrp = IoGetCurrentIrpStackLocation(Irp);
   if(pIoStackIrp){
     size = pIoStackIrp->Parameters.Read.Length;
@@ -76,7 +76,7 @@ NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   int *payload;
   PHYSICAL_ADDRESS paddr;
 
-	DbgPrint("IOCTL handler called\r\n");
+  DbgPrint("IOCTL handler called\r\n");
   if( (pIoStackIrp->
        Parameters.DeviceIoControl.IoControlCode == IOCTL_EEYE_INITFB)
       && (pIoStackIrp->
@@ -85,13 +85,14 @@ NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
     payload = (int *)Irp->AssociatedIrp.SystemBuffer;
     FBPhysAddr = payload[0];
     FBSz = payload[1];
-    if( FBPhysAddr && (FBSz > 0) ){
+    if( FBPhysAddr && (FBSz > 0) && !vaddr){
       paddr.QuadPart = FBPhysAddr;
       vaddr = MmMapIoSpace(paddr, FBSz, MmNonCached);
       DbgPrint("FBPhysAddr: %p,\nPBSz: 0x%x,\nFB mapped @ virt addr %p\n", 
 	       FBPhysAddr, FBSz, vaddr);
       status = STATUS_SUCCESS;
     }
+    else status = STATUS_UNSUCCESSFUL;
   }
   else status = STATUS_INVALID_DEVICE_REQUEST;
   Irp->IoStatus.Status = status;
