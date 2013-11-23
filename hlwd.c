@@ -9,7 +9,7 @@ NTSTATUS Close(PDEVICE_OBJECT, PIRP);
 NTSTATUS HandleIOCTL(PDEVICE_OBJECT, PIRP);
 NTSTATUS NotImplemented(PDEVICE_OBJECT, PIRP);
 void Dtor(PDRIVER_OBJECT );
-int FBPhysAddr = 0, FBSz = 0;
+long int FBPhysAddr = 0, FBSz = 0;
 PVOID vaddr = 0;
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath){
   NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -57,9 +57,8 @@ NTSTATUS Read(PDEVICE_OBJECT  DriverObject, PIRP Irp){
     DbgPrint("User buffer @ virt addr %p\n", pBuffer);
     if( pBuffer && vaddr ){
       DbgPrint("Moving %i bytes from %p to %p\n", size, vaddr, pBuffer);
-      _asm cli;
-      RtlMoveMemory(pBuffer, vaddr, size);
-      _asm sti;
+      READ_REGISTER_BUFFER_UCHAR(vaddr, pBuffer, size);
+      DbgPrint("Moving finished\n");
       Irp->IoStatus.Information = size;
     }
     else DbgPrint("vaddr or PBuffer = NULL\r\n");
@@ -73,23 +72,25 @@ NTSTATUS Read(PDEVICE_OBJECT  DriverObject, PIRP Irp){
 NTSTATUS HandleIOCTL(PDEVICE_OBJECT  DriverObject, PIRP Irp){
   NTSTATUS status = STATUS_UNSUCCESSFUL;
   PIO_STACK_LOCATION pIoStackIrp = IoGetCurrentIrpStackLocation(Irp);
-  int *payload;
+  long int *payload;
   PHYSICAL_ADDRESS paddr;
 
   DbgPrint("IOCTL handler called\r\n");
   if( (pIoStackIrp->
        Parameters.DeviceIoControl.IoControlCode == IOCTL_EEYE_INITFB)
       && (pIoStackIrp->
-	  Parameters.DeviceIoControl.InputBufferLength == 2*sizeof(int))
+	  Parameters.DeviceIoControl.InputBufferLength == 2*sizeof(long int))
       && (Irp->AssociatedIrp.SystemBuffer) ){
-    payload = (int *)Irp->AssociatedIrp.SystemBuffer;
+    payload = (long int *)Irp->AssociatedIrp.SystemBuffer;
     FBPhysAddr = payload[0];
     FBSz = payload[1];
     if( FBPhysAddr && (FBSz > 0) && !vaddr){
-      paddr.QuadPart = FBPhysAddr;
-      vaddr = MmMapIoSpace(paddr, FBSz, MmNonCached);
+      paddr.u.LowPart = FBPhysAddr;
+      paddr.u.HighPart = 0;
+      vaddr = MmMapIoSpace(paddr, FBSz, MmWriteCombined); //tried all caching flags
       DbgPrint("FBPhysAddr: %p,\nPBSz: 0x%x,\nFB mapped @ virt addr %p\n", 
 	       FBPhysAddr, FBSz, vaddr);
+      DbgPrint("0x%llx\n", paddr.QuadPart);
       status = STATUS_SUCCESS;
     }
     else status = STATUS_UNSUCCESSFUL;
